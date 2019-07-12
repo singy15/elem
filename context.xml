@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <beans>
+    <!-- <bean id="SampleApp.IPersonService" type="SampleApp.PersonService"></bean> -->
+    <bean id="SampleApp.IPersonService" type="SampleApp.MockPersonService"></bean>
+  </beans>
+</configuration>
+

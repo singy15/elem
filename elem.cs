@@ -16,25 +16,24 @@ namespace Elem {
   [AttributeUsage(AttributeTargets.Class)]
   class Component : Attribute { }
 
+  [AttributeUsage(AttributeTargets.Class)]
+  class Controller : Component { }
+
+  [AttributeUsage(AttributeTargets.Class)]
+  class Service : Component { }
+
   [AttributeUsage(AttributeTargets.Property)]
   class Autowired : Attribute { }
-
-  [AttributeUsage(AttributeTargets.Class)]
-  class Controller : Attribute { }
-
-  [AttributeUsage(AttributeTargets.Class)]
-  class Service : Attribute { }
 
   class Context {
     private HashSet<Type> types = new HashSet<Type>();
     private Dictionary<Type, object> pool = new Dictionary<Type, object>();
 
     public Context() {
-      Assembly.GetExecutingAssembly()
+      Assembly
+        .GetExecutingAssembly()
         .GetTypes()
-        .Where(x => (null != x.GetCustomAttribute(typeof(Component)))
-                    || (null != x.GetCustomAttribute(typeof(Controller)))
-                    || (null != x.GetCustomAttribute(typeof(Service))))
+        .Where(x => (null != x.GetCustomAttribute(typeof(Component))))
         .ToList()
         .ForEach(x => types.Add(x));
     }

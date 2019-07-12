@@ -71,7 +71,7 @@ namespace Elem {
   }
 
   class Server {
-    private const string ROOT_URL_BASE = "http://localhost:{0}/";
+    private const string ROOT_URL_BASE = "http://*:{0}/";
     private const string STATIC_ROOT = "./public/";
     private string rootUrl;
     private List<object> controllers;
@@ -107,6 +107,7 @@ namespace Elem {
 
     public void Routing(HttpListenerContext context) {
       string url = context.Request.Url.ToString();
+      string localPath = context.Request.Url.LocalPath.ToString();
 
       context.Response.StatusCode = 200;
 
@@ -118,8 +119,8 @@ namespace Elem {
                     (value, m) => new { Ctrl = value, MethodInfo = m })
         .Where(x => 
             (null != x.MethodInfo.GetCustomAttribute(typeof(UrlPattern)))
-            && Regex.IsMatch(url, 
-                rootUrl + ((UrlPattern)x.MethodInfo.GetCustomAttribute(
+            && Regex.IsMatch(localPath, 
+                ((UrlPattern)x.MethodInfo.GetCustomAttribute(
                         typeof(UrlPattern))).Pattern))
         .FirstOrDefault();
 
@@ -166,50 +167,6 @@ namespace Elem {
     public string Pattern { get; set; }
     public UrlPattern(string pattern) {
       Pattern = pattern;
-    }
-  }
-}
-
-namespace App {
-  using Elem;
-
-  class Program {
-    public static void Main(string[] args) {
-      (new Server()).Start(/* PORT */5000);
-    }
-  }
-
-  [Controller]
-  class ItemController {
-    [Autowired]
-    public ItemService Svc { set; get; }
-
-    [UrlPattern("item/list")]
-    public void List(HttpListenerContext context) {
-      ServerUtil.WriteResponseText(context, ServerUtil.ToJson(Svc.GetList()));
-    }
-  }
-
-  [Service]
-  class ItemService { 
-    [Autowired]
-    public RandomUtil Util { set; get; }
-
-    public List<string> GetList() {
-      return Util.CreateRandomItemList(10);
-    }
-  }
-
-  [Component]
-  class RandomUtil {
-    public List<string> CreateRandomItemList(int n) {
-      List<string> itemList = new List<string>();
-      System.Random rnd = new System.Random();
-      for(int i = 0; i < n; i++) {
-        itemList.Add(String.Format("Item{0}", rnd.Next(100)));
-      }
-
-      return  itemList;
     }
   }
 }

@@ -4,7 +4,7 @@
 
 //// Add following references
 // - System.Runtime.Serialization
-// - System.Text.Json 
+// - System.Text.Json (install using nuget)
 
 using System;
 using System.Reflection;
@@ -79,7 +79,8 @@ namespace Elem
         public static List<MethodInfo> GetFilteredMethods(Type type, BindingFlags flags, List<Type> attributes = null)
         {
             IEnumerable<MethodInfo> ls = type.GetMethods(flags).ToList();
-            foreach (var attr in attributes) {
+            foreach (var attr in attributes)
+            {
                 ls = ls.Where(x => (null != x.GetCustomAttribute(attr)));
             }
             return ls.ToList();
@@ -380,6 +381,64 @@ namespace Elem
             return "^" + regexPattern + "$";
         }
 
+        public List<string> ConvertParameterizedUriToRegexPatterns(string parameterizedUri)
+        {
+            var patterns = new List<string>();
+            var parts = parameterizedUri.Split('/').ToList();
+
+            foreach (var part in parts)
+            {
+                var p = part;
+                var match = Regex.Match(p, "{(?<name>.+?)}");
+                if (match.Success)
+                {
+                    string name = match.Groups["name"].Value;
+                    p = Regex.Replace(p, "{(?<name>.+?)}", "(?<" + name + ">.+?)");
+                }
+                patterns.Add("^" + p + "$");
+            }
+
+            return patterns;
+        }
+
+        public bool IsUrlMatch(string parameterizedUrl, string actualUrl)
+        {
+            var patterns = ConvertParameterizedUriToRegexPatterns(parameterizedUrl);
+            var actualParts = actualUrl.Split('/').ToList();
+
+            if (patterns.Count != actualParts.Count) { return false; }
+
+            for (int i = 0; i < actualParts.Count; i++)
+            {
+                if (!Regex.IsMatch(actualParts[i], patterns[i])) { return false; }
+            }
+
+            return true;
+        }
+
+        public Dictionary<string, string> ExtractParamsFromUrl(string parameterizedUrl, string actualUrl)
+        {
+            var paramDic = new Dictionary<string, string>();
+            var patterns = ConvertParameterizedUriToRegexPatterns(parameterizedUrl);
+            var actualParts = actualUrl.Split('/').ToList();
+
+            if (patterns.Count != actualParts.Count)
+            {
+                throw new InvalidOperationException("url pattern not match");
+            }
+
+            for (int i = 0; i < actualParts.Count; i++)
+            {
+                var match = Regex.Match(actualParts[i], patterns[i]);
+                if (match.Groups.Count > 1)
+                {
+                    paramDic.Add(match.Groups[1].Name, match.Groups[1].Value);
+                }
+            }
+
+            return paramDic;
+        }
+
         public void ResolveRouting(HttpListenerContext context)
         {
             string url = context.Request.Url.ToString();
@@ -400,11 +459,15 @@ namespace Elem
                   (null != x.MethodInfo.GetCustomAttribute(typeof(Routing)))
                   && (StringToRouteMethod(httpMethod)
                     == ((Routing)x.MethodInfo.GetCustomAttribute(typeof(Routing))).Method))
+              //.Where(x =>
+              //    (null != x.MethodInfo.GetCustomAttribute(typeof(Routing)))
+              //    && Regex.IsMatch(localPath,
+              //        ConvertParameterizedUriToRegexPattern(((Routing)x.MethodInfo.GetCustomAttribute(
+              //                typeof(Routing))).Pattern)))
               .Where(x =>
                   (null != x.MethodInfo.GetCustomAttribute(typeof(Routing)))
-                  && Regex.IsMatch(localPath,
-                      ConvertParameterizedUriToRegexPattern(((Routing)x.MethodInfo.GetCustomAttribute(
-                              typeof(Routing))).Pattern)))
+                  && IsUrlMatch(((Routing)x.MethodInfo.GetCustomAttribute(typeof(Routing))).Pattern,
+                      localPath))
               .FirstOrDefault();
 
             // Console.WriteLine(localPath);
@@ -423,7 +486,8 @@ namespace Elem
                 // Call method when a route found
                 try
                 {
-                    Match match = (new Regex(ConvertParameterizedUriToRegexPattern(attrRouting.Pattern))).Match(localPath);
+                    //Match match = (new Regex(ConvertParameterizedUriToRegexPattern(attrRouting.Pattern))).Match(localPath);
+                    Dictionary<string, string> urlParams = ExtractParamsFromUrl(attrRouting.Pattern, localPath);
 
                     List<object> parameters = new List<object>();
 
@@ -458,7 +522,8 @@ namespace Elem
                         string paramValue = null;
                         if (null != attrUriParam)
                         {
-                            paramValue = match.Groups[p.Name].Value;
+                            //paramValue = match.Groups[p.Name].Value;
+                            paramValue = urlParams[p.Name];
                         }
                         else
                         {
